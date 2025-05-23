@@ -1,9 +1,10 @@
 # To read Key
 import json
-
+import re
 
 import discord
 from discord.ext import commands
+from discord.ui import View, Button
 import asyncio
 import yt_dlp
 
@@ -16,9 +17,14 @@ now_playing = None
 
 
 # JSON :: Discord Bot Token
-def discord_token():
+def get_discord_token():
     with open("key.json", "r") as f:
         return json.load(f)["discord"]
+
+def is_url(string):
+    # 정규 URL 패턴
+    url_pattern = re.compile(r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+$')
+    return bool(url_pattern.match(string))
 
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
@@ -63,8 +69,35 @@ async def play_next(ctx):
         ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
         await ctx.send(f'재생 중: {player.title}')
     except Exception as e:
-        await ctx.send(f"재생 중 오류 발생: {e}")
+        await ctx.send(f"재생 중 오류 발생: {e}\n 자동으로 다음 곡 재생합니다.")
+        await play_next(ctx)
+        # return
+
+# 검색 결과 보여주기
+async def show_search_results(ctx, search_term):
+    search_query = f"ytsearch5:{search_term}"
+    info = ytdl.extract_info(search_query, download=False)
+    results = info.get("entries", [])
+
+    if not results:
+        await ctx.send("검색 결과 없음..")
         return
+
+    # 버튼 뷰! 사용자가 직접 선택 가능하도록
+    view = View()
+    for index, entry in enumerate(results):
+        button = Button(label=entry["title"][:80], style=discord.ButtonStyle.primary)
+        async def button_callback(interaction, url=entry["webpage_url"], title=entry["title"]):
+            await interaction.response.defer()
+            await queue.put(url)
+            await interaction.followup.send(f"선택: {title}")
+            if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
+                await play_next(ctx)
+
+        button.callback = button_callback
+        view.add_item(button)
+
+    await ctx.send("원하는 곡을 선택하세요:", view=view)
 
 @bot.command()
 async def play(ctx, url):
@@ -74,10 +107,17 @@ async def play(ctx, url):
             await channel.connect()
             await ctx.send("음성 채널로 이동!")
         else:
-            await ctx.send("음성 채널에 먼저 접속해주세요.")
+            await ctx.send("음성 채널에 먼저 접속하셈..")
             return
 
-    await queue.put(url)
+    if is_url(url):
+        await queue.put(url)
+        await ctx.send("URL 대기열에 추가!")
+        if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
+            await play_next(ctx)
+    else:
+        await show_search_results(ctx, url)
+
     await ctx.send("대기열에 추가함. ")
 
     # 재생중? --> 아니면 바로 재생
@@ -102,4 +142,4 @@ async def resume(ctx):
         ctx.voice_client.resume()
         await ctx.send("다시 재생할게 ㅋ")
 
-bot.run(discord_token())
+bot.run(get_discord_token())
