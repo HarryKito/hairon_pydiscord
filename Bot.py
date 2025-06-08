@@ -1,12 +1,15 @@
-# To read Key
-import json
-import re
+# pip install -U yt-dlp
 
-import discord
+# To read Key
+from tools import *
+
 from discord.ext import commands
 from discord.ui import View, Button
-import asyncio
-import yt_dlp
+
+# youtube
+
+# custom libs
+from yt_lib import *
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -15,46 +18,7 @@ intents.message_content = True
 queue = asyncio.Queue()
 now_playing = None
 
-
-# JSON :: Discord Bot Token
-def get_discord_token():
-    with open("key.json", "r") as f:
-        return json.load(f)["discord"]
-
-def is_url(string):
-    # 정규 URL 패턴
-    url_pattern = re.compile(r'^(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+$')
-    return bool(url_pattern.match(string))
-
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
-
-ytdl_format_options = {
-    'format': 'bestaudio[ext=m4a]/bestaudio/best',
-    'quiet': True,
-    'noplaylist': True,
-}
-
-ffmpeg_options = {
-    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn'
-}
-
-ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
-
-class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
-        super().__init__(source, volume)
-        self.data = data
-        self.title = data.get('title')
-
-    @classmethod
-    async def from_url(cls, url, *, loop=None):
-        loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=False))
-        if 'entries' in data:
-            data = data['entries'][0]
-        filename = data['url']
-        return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 async def play_next(ctx):
     global now_playing
@@ -126,20 +90,55 @@ async def play(ctx, url):
 
 @bot.command()
 async def skip(ctx):
+    """ Skip the music """
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.stop()
         await ctx.send("노래 스킵함 ㅇㅇ")
 
 @bot.command()
 async def pause(ctx):
+    """ Stop the music """
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.pause()
         await ctx.send("일시정지")
 
 @bot.command()
-async def resume(ctx):
-    if ctx.voice_client and ctx.voice_client.is_paused():
-        ctx.voice_client.resume()
-        await ctx.send("다시 재생할게 ㅋ")
+async def todo(ctx, *, task: str):
+    with open("todo.txt", "a", encoding="utf-8") as f:
+        f.write(task + "\n")
+    await ctx.send(f"📝 TODO 추가!: `{task}`")
+@bot.command()
+async def dokie(ctx):
+    await ctx.send("핳핳 나는야 김도끼. 세상을 지배하지 핳핳")
+    await ctx.send("핳핳 나는야 김도끼. 세상을 지배하지 핳핳")
+
+@bot.command()
+async def trends(ctx):
+    """
+    Trends music list
+    """
+    await ctx.send(" YouTube 실시간 음악 트렌드")
+    trending_list = yt_lib.fetch_music_trending(10)
+    for entry in trending_list:
+        await ctx.send(entry)
+
+@bot.command()
+async def list(ctx):
+    """
+    List of my plans!
+    """
+    try:
+        with open("todo.txt", "r", encoding="utf-8") as f:
+            tasks = f.readlines()
+
+        if not tasks:
+            await ctx.send("할 일이 없슴")
+        else:
+            message = "**📋 To-Do 목록:**\n"
+            for i, task in enumerate(tasks, start=1):
+                message += f"{i}. {task.strip()}\n"
+            await ctx.send(message)
+    except FileNotFoundError:
+        await ctx.send("TODO 파일없음....")
 
 bot.run(get_discord_token())
