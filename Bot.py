@@ -118,26 +118,24 @@ async def trends(ctx):
     Trends music list
     """
     await ctx.send(" YouTube 실시간 음악 트렌드")
-    trending_list = yt_lib.fetch_music_trending(10)
+    trending_list = fetch_music_trending(10)
     for entry in trending_list:
         await ctx.send(entry)
 
 @bot.command()
 async def list(ctx):
-    """
-    List of my plans!
-    """
     try:
         with open("todo.txt", "r", encoding="utf-8") as f:
             tasks = f.readlines()
 
         if not tasks:
-            await ctx.send("할 일이 없슴")
+            await ctx.send("📭 할 일이 없어!")
         else:
-            message = "**📋 To-Do 목록:**\n"
-            for i, task in enumerate(tasks, start=1):
-                message += f"{i}. {task.strip()}\n"
-            await ctx.send(message)
+            header = f"{'번호':<4} | {'할 일':<30}\n"
+            separator = "-" * 40 + "\n"
+            rows = [f"{i+1:<4} | {task.strip():<30}\n" for i, task in enumerate(tasks)]
+            table = "```" + header + separator + "".join(rows) + "```"
+            await ctx.send(table)
     except FileNotFoundError:
         await ctx.send("TODO 파일없음....")
 
