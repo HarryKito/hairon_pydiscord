@@ -2,6 +2,7 @@
 
 # To read Key
 from tools import *
+from gtts import gTTS
 
 from discord.ext import commands
 from discord.ui import View, Button
@@ -65,28 +66,72 @@ async def show_search_results(ctx, search_term):
 
 @bot.command()
 async def play(ctx, url):
+    try:
+        await ctx.message.delete()  # 사용자 입력 명령어 삭제
+    except discord.Forbidden:
+        pass
+    except discord.HTTPException:
+        pass
+
     if not ctx.voice_client:
         if ctx.author.voice:
             channel = ctx.author.voice.channel
             await channel.connect()
-            await ctx.send("음성 채널로 이동!")
+            msg = await ctx.send("음성 채널로 이동!")
+            await asyncio.sleep(3)
+            await msg.delete()
         else:
-            await ctx.send("음성 채널에 먼저 접속하셈..")
+            msg = await ctx.send("음성 채널에 먼저 접속하셈..")
+            await asyncio.sleep(3)
+            await msg.delete()
             return
 
     if is_url(url):
         await queue.put(url)
         await ctx.send("URL 대기열에 추가!")
+
         if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
             await play_next(ctx)
     else:
         await show_search_results(ctx, url)
+        return
 
-    await ctx.send("대기열에 추가함. ")
+    msg = await ctx.send("대기열에 추가함.")
+    await asyncio.sleep(3)
+    await msg.delete()
 
-    # 재생중? --> 아니면 바로 재생
     if not ctx.voice_client.is_playing() and not ctx.voice_client.is_paused():
         await play_next(ctx)
+
+
+@bot.command()
+async def tts(ctx, *, text: str):
+    # 사용자 음성 채널에 접속
+    if ctx.author.voice:
+        channel = ctx.author.voice.channel
+        if not ctx.voice_client:
+            await channel.connect()
+        elif ctx.voice_client.channel != channel:
+            await ctx.voice_client.move_to(channel)
+    else:
+        await ctx.send("🎤 음성 채널에 먼저 접속해 주세요!")
+        return
+
+    # TTS 생성 및 저장
+    tts = gTTS(text=text, lang='ko')
+    filename = "tts.mp3"
+    tts.save(filename)
+
+    # 재생
+    vc = ctx.voice_client
+    if vc.is_playing():
+        vc.stop()
+
+    source = discord.FFmpegPCMAudio(filename)
+    volume_source = discord.PCMVolumeTransformer(source, volume=3)  # 50% 볼륨
+
+    vc.play(volume_source, after=lambda e: print("재생 완료"))
+    await ctx.send(f"🗣️ TTS 재생: `{text}`")
 
 @bot.command()
 async def skip(ctx):
@@ -109,8 +154,8 @@ async def todo(ctx, *, task: str):
     await ctx.send(f"📝 TODO 추가!: `{task}`")
 @bot.command()
 async def dokie(ctx):
-    await ctx.send("핳핳 나는야 김도끼. 세상을 지배하지 핳핳")
-    await ctx.send("핳핳 나는야 김도끼. 세상을 지배하지 핳핳")
+    for i in range(10):
+        await ctx.send("핳핳 나는야 김도끼. 세상을 지배하지 핳핳")
 
 @bot.command()
 async def trends(ctx):
