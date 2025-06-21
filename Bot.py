@@ -65,9 +65,15 @@ async def show_search_results(ctx, search_term):
     await ctx.send("원하는 곡을 선택하세요:", view=view)
 
 @bot.command()
+async def resume(ctx):
+    if ctx.voice_client and ctx.voice_client.is_paused():
+        ctx.voice_client.resume()
+        await ctx.send("음악 다시 재생할게용")
+
+@bot.command()
 async def play(ctx, url):
     try:
-        await ctx.message.delete()  # 사용자 입력 명령어 삭제
+        await ctx.message.delete()  # 사용자 입력 령명어 삭제
     except discord.Forbidden:
         pass
     except discord.HTTPException:
@@ -106,7 +112,6 @@ async def play(ctx, url):
 
 @bot.command()
 async def tts(ctx, *, text: str):
-    # 사용자 음성 채널에 접속
     if ctx.author.voice:
         channel = ctx.author.voice.channel
         if not ctx.voice_client:
@@ -117,21 +122,25 @@ async def tts(ctx, *, text: str):
         await ctx.send("🎤 음성 채널에 먼저 접속해 주세요!")
         return
 
-    # TTS 생성 및 저장
+    # Create the TTS and save
+    # FIXME: 흐음... 이 방법이 최선인가?
     tts = gTTS(text=text, lang='ko')
     filename = "tts.mp3"
     tts.save(filename)
 
-    # 재생
+    # Stop the music
     vc = ctx.voice_client
     if vc.is_playing():
         vc.stop()
 
     source = discord.FFmpegPCMAudio(filename)
-    volume_source = discord.PCMVolumeTransformer(source, volume=3)  # 50% 볼륨
+    volume_source = discord.PCMVolumeTransformer(source, volume=5)
+    # done = False
 
-    vc.play(volume_source, after=lambda e: print("재생 완료"))
+    # FIXME: Stop the music when the tts played, after then play music again...
+    vc.play(volume_source, after=lambda e: vc.resume())
     await ctx.send(f"🗣️ TTS 재생: `{text}`")
+
 
 @bot.command()
 async def skip(ctx):
@@ -145,7 +154,7 @@ async def pause(ctx):
     """ Stop the music """
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.pause()
-        await ctx.send("일시정지")
+        await ctx.send("STOP to playing")
 
 @bot.command()
 async def todo(ctx, *, task: str):
