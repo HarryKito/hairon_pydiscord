@@ -7,10 +7,10 @@ from gtts import gTTS
 from discord.ext import commands
 from discord.ui import View, Button
 
-# youtube
-
 # custom libs
 from yt_lib import *
+
+system.update_yt_dlp()
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -70,7 +70,6 @@ async def resume(ctx):
         ctx.voice_client.resume()
         await ctx.send("음악 다시 재생할게용")
 
-
 async def play_next(ctx):
     global now_playing
     if queue.empty():
@@ -110,7 +109,7 @@ async def play(ctx, url):
             await msg.delete()
             return
 
-    if is_url(url):
+    if tools.is_url(url):
         await queue.put(url)
         await ctx.send("URL 대기열에 추가!")
 
@@ -224,4 +223,4 @@ async def list(ctx):
     except FileNotFoundError:
         await ctx.send("TODO 파일없음....")
 
-bot.run(get_discord_token())
+bot.run(tools.get_discord_token())
