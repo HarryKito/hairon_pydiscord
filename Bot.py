@@ -70,6 +70,24 @@ async def resume(ctx):
         ctx.voice_client.resume()
         await ctx.send("음악 다시 재생할게용")
 
+
+async def play_next(ctx):
+    global now_playing
+    if queue.empty():
+        now_playing = None
+        return
+
+    url = await queue.get()
+    try:
+        player = await YTDLSource.from_url(url, loop=bot.loop)
+        now_playing = player
+        ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
+        await ctx.send(f'재생 중: {player.title}')
+    except Exception as e:
+        await ctx.send(f"재생 중 오류 발생: {e}\n 자동으로 다음 곡 재생합니다.")
+        await play_next(ctx)
+        # return
+
 @bot.command()
 async def play(ctx, url):
     try:
@@ -112,6 +130,13 @@ async def play(ctx, url):
 
 @bot.command()
 async def tts(ctx, *, text: str):
+    try:
+        await ctx.message.delete()
+    except discord.Forbidden:
+        pass
+    except discord.HTTPException:
+        pass
+
     if ctx.author.voice:
         channel = ctx.author.voice.channel
         if not ctx.voice_client:
@@ -119,7 +144,7 @@ async def tts(ctx, *, text: str):
         elif ctx.voice_client.channel != channel:
             await ctx.voice_client.move_to(channel)
     else:
-        await ctx.send("🎤 음성 채널에 먼저 접속해 주세요!")
+        await ctx.send("음성 채널에 먼저 접속하셈.")
         return
 
     # Create the TTS and save
@@ -139,15 +164,20 @@ async def tts(ctx, *, text: str):
 
     # FIXME: Stop the music when the tts played, after then play music again...
     vc.play(volume_source, after=lambda e: vc.resume())
-    await ctx.send(f"🗣️ TTS 재생: `{text}`")
+    await ctx.send(f"TTS 재생: `{text}`")
 
 
 @bot.command()
 async def skip(ctx):
+    try:
+        await ctx.message.delete()
+    except (discord.Forbidden, discord.HTTPException):
+        pass
     """ Skip the music """
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.stop()
         await ctx.send("노래 스킵함 ㅇㅇ")
+
 
 @bot.command()
 async def pause(ctx):
@@ -160,7 +190,8 @@ async def pause(ctx):
 async def todo(ctx, *, task: str):
     with open("todo.txt", "a", encoding="utf-8") as f:
         f.write(task + "\n")
-    await ctx.send(f"📝 TODO 추가!: `{task}`")
+    await ctx.send(f"TODO 추가!: `{task}`")
+
 @bot.command()
 async def dokie(ctx):
     for i in range(10):
@@ -183,7 +214,7 @@ async def list(ctx):
             tasks = f.readlines()
 
         if not tasks:
-            await ctx.send("📭 할 일이 없어!")
+            await ctx.send(" 할 일이 없어!")
         else:
             header = f"{'번호':<4} | {'할 일':<30}\n"
             separator = "-" * 40 + "\n"
