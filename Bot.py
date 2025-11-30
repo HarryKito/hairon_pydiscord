@@ -38,6 +38,25 @@ async def play_next(ctx):
         await play_next(ctx)
         # return
 
+
+async def play_next(ctx):
+    global now_playing
+    if queue.empty():
+        now_playing = None
+        return
+
+    url = await queue.get()
+    try:
+        player = await YTDLSource.from_url(url, loop=bot.loop)
+        now_playing = player
+        ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
+        await ctx.send(f'재생 중: {player.title}')
+    except Exception as e:
+        await ctx.send(f"재생 중 오류 발생: {e}\n 자동으로 다음 곡 재생합니다.")
+        await play_next(ctx)
+        # return
+
+
 # 검색 결과 보여주기
 async def show_search_results(ctx, search_term):
     search_query = f"ytsearch5:{search_term}"
@@ -70,22 +89,6 @@ async def resume(ctx):
         ctx.voice_client.resume()
         await ctx.send("음악 다시 재생할게용")
 
-async def play_next(ctx):
-    global now_playing
-    if queue.empty():
-        now_playing = None
-        return
-
-    url = await queue.get()
-    try:
-        player = await YTDLSource.from_url(url, loop=bot.loop)
-        now_playing = player
-        ctx.voice_client.play(player, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop))
-        await ctx.send(f'재생 중: {player.title}')
-    except Exception as e:
-        await ctx.send(f"재생 중 오류 발생: {e}\n 자동으로 다음 곡 재생합니다.")
-        await play_next(ctx)
-        # return
 
 @bot.command()
 async def play(ctx, url):
